@@ -41,3 +41,21 @@ def upload_photo():
     os.remove(temp_path)
 
     return jsonify({"status": "success", "filename": file.filename})
+
+@sync_bp.route("/list", methods=["GET", "OPTIONS"])
+@cross_origin()
+def list_photos():
+    if request.method == "OPTIONS":
+        return jsonify({"msg": "OK"}), 200
+    
+    try:
+        objects = MINIO_CLIENT.list_objects(BUCKET)
+        files = []
+        for obj in objects:
+            url = MINIO_CLIENT.presigned_get_object(BUCKET, obj.object_name)
+            files.append({"name": obj.object_name, "url": url})
+        return jsonify({"status": "success", "files": files})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+ 
