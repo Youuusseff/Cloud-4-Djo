@@ -1,7 +1,7 @@
 import axios from "axios";
 import { Platform } from "react-native";
 
-const API_BASE_URL = Platform.OS === 'web' ? "http://127.0.0.1:5000" : "http://192.168.1.118:5000";
+const API_BASE_URL = Platform.OS === 'web' ? "http://127.0.0.1:5000" : "http://192.168.1.19:5000";
 
 export async function loginUser(username, password) {
     console.log("Logging in with:", username, password);
@@ -51,4 +51,14 @@ export async function uploadPhotosBatch(photos) {
     }
   }
   return results;
+}
+
+export async function getList() {
+  try{
+    const response = await axios.get(`${API_BASE_URL}/sync/list`);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching list:", error);
+    throw error;
+  }
 }

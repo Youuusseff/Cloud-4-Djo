@@ -1,7 +1,7 @@
-import { uploadPhotosBatch } from "@/utils/api";
-import React, { useState } from "react";
-import { Button, FlatList, Image, Text, View, Alert } from "react-native";
+import { getList, uploadPhotosBatch } from "@/utils/api";
 import * as ImagePicker from "expo-image-picker";
+import React, { useEffect, useState } from "react";
+import { Alert, Button, FlatList, Image, Text, View } from "react-native";
 
 export default function HomeScreen() {
   const [photos, setPhotos] = useState<ImagePicker.ImagePickerAsset[]>([]);
@@ -45,7 +45,7 @@ export default function HomeScreen() {
         }));
         
         await uploadPhotosBatch(assets);
-        setPhotos(result.assets);
+        setPhotos(prev => [...prev, ...result.assets]);
       }
     } catch (error) {
       console.error("Error selecting images:", error);
@@ -54,6 +54,24 @@ export default function HomeScreen() {
       setSyncing(false);
     }
   };
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const res = await getList();
+
+        if (res.status === "success" && Array.isArray(res.files)) {
+          setPhotos(res.files);
+          console.log("Photos: ", photos);
+        }
+      } catch (error) {
+        console.error("Error fetching list:", error);
+      }
+    };
+
+    fetchData();
+  }, []);
+
 
   return (
     <View style={{ flex: 1, padding: 20 }}>
