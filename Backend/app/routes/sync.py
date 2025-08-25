@@ -5,16 +5,16 @@ import os
 
 sync_bp = Blueprint("sync", __name__)
 
-# MinIO client
+
 MINIO_CLIENT = Minio(
-    "localhost:9000",
+    "192.168.1.19:9000",
     access_key="admin",
     secret_key="admin123",
     secure=False
 )
 BUCKET = "photos"
 
-# Ensure bucket exists
+
 if not MINIO_CLIENT.bucket_exists(BUCKET):
     MINIO_CLIENT.make_bucket(BUCKET)
 
@@ -53,7 +53,13 @@ def list_photos():
         files = []
         for obj in objects:
             url = MINIO_CLIENT.presigned_get_object(BUCKET, obj.object_name)
-            files.append({"name": obj.object_name, "url": url})
+            files.append({
+                "fileName": obj.object_name,
+                "uri": url,
+                "width": 100,
+                "height": 100,
+                "type": "image"
+                })
         return jsonify({"status": "success", "files": files})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
