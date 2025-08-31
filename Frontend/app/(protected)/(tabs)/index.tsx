@@ -1,11 +1,13 @@
+import { useUserContext } from "@/hooks/useUser";
 import { getList, uploadPhotosBatch } from "@/utils/api";
 import * as ImagePicker from "expo-image-picker";
 import React, { useEffect, useState } from "react";
-import { Alert, Button, FlatList, Image, Text, View } from "react-native";
+import { Alert, Button, FlatList, Image, Pressable, Text, View } from "react-native";
 
 export default function HomeScreen() {
   const [photos, setPhotos] = useState<ImagePicker.ImagePickerAsset[]>([]);
   const [syncing, setSyncing] = useState(false);
+  const { logOut } = useUserContext();
 
   const startSync = async () => {
     setSyncing(true);
@@ -89,6 +91,9 @@ export default function HomeScreen() {
         )}
         numColumns={3}
       />
+      <Pressable onPress={() => logOut()}>
+        <Text>LogOut</Text>
+      </Pressable>
     </View>
   );
 }

@@ -12,8 +12,10 @@ type userContextType = {
   token: string;
   isLoading: boolean;
   isAuthenticated: boolean;
+  isFirstLaunch: boolean;
   logIn: (username: string, password: string) => Promise<void>;
   logOut: () => void;
+  completeOnboarding: () => Promise<void>; // New method
 }
 
 export const UserContext = React.createContext<userContextType | null>(null);
@@ -26,6 +28,7 @@ const STORAGE_KEYS = {
   TOKEN: '@user_token',
   USERNAME: '@user_username',
   EMAIL: '@user_email',
+  IS_FIRST_LAUNCH: '@user_is_first_launch'
 };
 
 export const MyUserContextProvider: React.FC<Props> = ({ children }) => {
@@ -33,6 +36,7 @@ export const MyUserContextProvider: React.FC<Props> = ({ children }) => {
   const [username, setUsername] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [token, setToken] = React.useState("");
+  const [isFirstLaunch, setIsFirstLaunch] = React.useState(true);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isInitialized, setIsInitialized] = React.useState(false);
 
@@ -41,10 +45,11 @@ export const MyUserContextProvider: React.FC<Props> = ({ children }) => {
     const loadStoredData = async () => {
       try {
         console.log("Loading stored data...");
-        const [storedToken, storedUsername, storedEmail] = await Promise.all([
+        const [storedToken, storedUsername, storedEmail, storedIsFirstLaunch] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.TOKEN),
           AsyncStorage.getItem(STORAGE_KEYS.USERNAME),
           AsyncStorage.getItem(STORAGE_KEYS.EMAIL),
+          AsyncStorage.getItem(STORAGE_KEYS.IS_FIRST_LAUNCH),
         ]);
 
         console.log("Stored token:", storedToken ? "Found" : "Not found");
@@ -53,8 +58,17 @@ export const MyUserContextProvider: React.FC<Props> = ({ children }) => {
           setToken(storedToken);
           setUsername(storedUsername || "");
           setEmail(storedEmail || "");
-          console.log("User data restored from storage");
         }
+        
+        // Handle first launch flag
+        if (storedIsFirstLaunch !== null) {
+          setIsFirstLaunch(storedIsFirstLaunch === 'true');
+        } else {
+          // If no stored value, it's the first launch
+          setIsFirstLaunch(true);
+        }
+        
+        console.log("User data restored from storage");
       } catch (error) {
         console.error("Error loading stored data:", error);
         // Clear potentially corrupted data
@@ -72,7 +86,11 @@ export const MyUserContextProvider: React.FC<Props> = ({ children }) => {
   useEffect(() => {
     if (!isInitialized) return;
 
-    if (token) {
+    if (isFirstLaunch) {
+      SplashScreen.hideAsync();
+      console.log("First launch, showing onboarding");
+      router.replace("/onboarding");
+    } else if (token) {
       SplashScreen.hideAsync();
       console.log("Token found, navigating to home");
       router.replace("/");
@@ -81,7 +99,7 @@ export const MyUserContextProvider: React.FC<Props> = ({ children }) => {
       console.log("No token found, navigating to login");
       router.replace("/login");
     }
-  }, [isInitialized, token, router]);
+  }, [isInitialized, token, isFirstLaunch, router]);
 
   const storeUserData = async (tokenData: string, usernameData: string, emailData: string) => {
     try {
@@ -108,6 +126,18 @@ export const MyUserContextProvider: React.FC<Props> = ({ children }) => {
       console.log("Stored data cleared successfully");
     } catch (error) {
       console.error("Error clearing stored data:", error);
+    }
+  };
+
+  const completeOnboarding = async (): Promise<void> => {
+    try {
+      console.log("Completing onboarding...");
+      await AsyncStorage.setItem(STORAGE_KEYS.IS_FIRST_LAUNCH, 'false');
+      setIsFirstLaunch(false);
+      console.log("Onboarding completed successfully");
+    } catch (error) {
+      console.error("Error completing onboarding:", error);
+      throw error;
     }
   };
 
@@ -155,7 +185,7 @@ export const MyUserContextProvider: React.FC<Props> = ({ children }) => {
     try {
       setIsLoading(true);
       
-      // Clear AsyncStorage first
+      // Clear AsyncStorage first (but keep first launch flag)
       await clearStoredData();
 
       // Then clear state
@@ -183,8 +213,10 @@ export const MyUserContextProvider: React.FC<Props> = ({ children }) => {
     token,
     isLoading,
     isAuthenticated: !!token,
+    isFirstLaunch,
     logIn,
     logOut,
+    completeOnboarding, // Add the new method
   };
 
   return (

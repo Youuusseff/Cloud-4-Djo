@@ -17,7 +17,7 @@ export default function RootLayout() {
         name="login"
         options={{
           title: "Login",
-          headerShown: true,
+          headerShown: false,
           animation: "none",
         }}
       />
@@ -25,7 +25,15 @@ export default function RootLayout() {
         name="register"
         options={{
           title: "Register",
-          headerShown: true,
+          headerShown: false,
+          animation: "Transition",
+        }}
+      />
+      <Stack.Screen
+        name="onboarding"
+        options={{
+          title: "Onboarding",
+          headerShown: false,
           animation: "none",
         }}
       />
