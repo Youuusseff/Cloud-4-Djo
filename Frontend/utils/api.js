@@ -1,7 +1,7 @@
 import axios from "axios";
 import { Platform } from "react-native";
 
-const API_BASE_URL = Platform.OS === 'web' ? "http://127.0.0.1:5000" : "http://172.20.10.2:5000";
+const API_BASE_URL = Platform.OS === 'web' ? "http://127.0.0.1:5000" : "http://192.168.1.156:5000";
 
 export async function loginUser(username, password) {
     console.log("Logging in with:", username, password);

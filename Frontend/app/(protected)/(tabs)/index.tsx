@@ -1,99 +1,207 @@
 import { useUserContext } from "@/hooks/useUser";
-import { getList, uploadPhotosBatch } from "@/utils/api";
+import { getList } from "@/utils/api";
+import formatBytes from "@/utils/formatBytes";
+import { syncPhotos } from "@/utils/syncPhotos";
+import { useFocusEffect } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
-import React, { useEffect, useState } from "react";
-import { Alert, Button, FlatList, Image, Pressable, Text, View } from "react-native";
+import React, { useCallback, useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  Image,
+  ImageBackground,
+  Pressable,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
+} from "react-native";
 
 export default function HomeScreen() {
   const [photos, setPhotos] = useState<ImagePicker.ImagePickerAsset[]>([]);
   const [syncing, setSyncing] = useState(false);
-  const { logOut } = useUserContext();
+  const [loading, setLoading] = useState(true);
+  const { logOut, username } = useUserContext();
+  const [usedStorage, setUsedStorage] = useState("0 Mb");
 
-  const startSync = async () => {
-    setSyncing(true);
-    
-    try {
-      // Request permissions first
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      
-      if (status !== 'granted') {
-        Alert.alert(
-          'Permission Required',
-          'This app needs access to your photo library to select photos.',
-          [{ text: 'OK' }]
-        );
-        setSyncing(false);
-        return;
+  useEffect(() => {
+    let total = 0;
+    photos.forEach((photo) => {
+      if (photo.fileSize) {
+        total += photo.fileSize;
       }
+    });
+    const formattedTotal = formatBytes(total);
+    setUsedStorage(formattedTotal);
+  }, [photos]);
 
-      // Launch image picker
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsMultipleSelection: true,
-        quality: 1,
-      });
+  const fetchPhotos = async () => {
+    try {
+      setLoading(true);
+      const res = await getList();
 
-      console.log("ImagePicker result:", result);
-
-      if (!result.canceled && result.assets) {
-        console.log("Assets:", result.assets);
-        
-        // Convert expo-image-picker assets to your expected format
-        const assets = result.assets.map(asset => ({
-          uri: asset.uri,
-          fileName: asset.fileName || `image_${Date.now()}.jpg`,
-          type: asset.type || 'image/jpeg',
-          fileSize: asset.fileSize,
-        }));
-        
-        await uploadPhotosBatch(assets);
-        setPhotos(prev => [...prev, ...result.assets]);
+      if (res.status === "success" && Array.isArray(res.files)) {
+        setPhotos(res.files);
       }
     } catch (error) {
-      console.error("Error selecting images:", error);
-      Alert.alert('Error', 'Failed to select images. Please try again.');
+      console.error("Error fetching list:", error);
     } finally {
-      setSyncing(false);
+      setLoading(false);
     }
   };
 
+  // Fetch photos when screen first loads
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const res = await getList();
-
-        if (res.status === "success" && Array.isArray(res.files)) {
-          setPhotos(res.files);
-          console.log("Photos: ", photos);
-        }
-      } catch (error) {
-        console.error("Error fetching list:", error);
-      }
-    };
-
-    fetchData();
+    fetchPhotos();
   }, []);
 
+  // Refresh photos when screen comes into focus (after uploading from tab button)
+  useFocusEffect(
+    useCallback(() => {
+      fetchPhotos();
+    }, [])
+  );
+
+  const handleManualUpload = async () => {
+  if (syncing) return;
+  
+  setSyncing(true);
+
+  try {
+    const addedPhotos = await syncPhotos();
+    
+    if (addedPhotos) {
+      // Filter out duplicates based on uri and update state in a single call
+      setPhotos((prevPhotos) => {
+        const newPhotos = addedPhotos.filter(
+          (newPhoto) =>
+            !prevPhotos.some(
+              (existingPhoto) =>
+                existingPhoto.uri === newPhoto.uri
+            )
+        );
+        return [...prevPhotos, ...newPhotos];
+      });
+    }
+  } catch (error) {
+    console.error("Error uploading photos:", error);
+  } finally {
+    setSyncing(false);
+  }
+};
+
+  console.log("Used Storage: ", usedStorage);
+  console.log("total size : ", usedStorage);
 
   return (
-    <View style={{ flex: 1, padding: 20 }}>
-      <Button title={syncing ? "Syncing..." : "Start Sync"} onPress={startSync} />
-      <FlatList
-        data={photos}
-        keyExtractor={(item, index) => item.uri ?? item.assetId ?? index.toString()}
-        renderItem={({ item }) => (
-          <View style={{ margin: 5 }}>
-            <Image source={{ uri: item.uri }} style={{ width: 100, height: 100 }} />
-            <Text style={{ width: 100, textAlign: "center" }}>
-              {item.fileName || 'Unknown'}
-            </Text>
+    <View style={{ flex: 1, backgroundColor: "#336df3" }}>
+      <ImageBackground source={require("@/assets/images/nav-background.png")}>
+        <View
+          style={{
+            height: 180,
+            width: "100%",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        ></View>
+      </ImageBackground>
+      <View style={{ alignItems: "center", marginTop: 0 }}>
+        <Text
+          style={{
+            fontSize: 30,
+            fontWeight: "bold",
+            textAlign: "center",
+            marginTop: 0,
+            color: "#fff",
+          }}
+        >
+          Welcome, {username}!
+        </Text>
+        <Text
+          style={{
+            fontSize: 16,
+            textAlign: "center",
+            marginTop: 15,
+            color: "#fff",
+          }}
+        >
+          Used Storage: {usedStorage}
+        </Text>
+      </View>
+      <View
+        style={{
+          backgroundColor: "#fff",
+          flex: 1,
+          marginTop: 20,
+          borderTopLeftRadius: 40,
+          borderTopRightRadius: 40,
+          padding: 10,
+        }}
+      >
+        {loading ? (
+          <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+            <ActivityIndicator size="large" color="#007BFF" />
+            <Text style={{ marginTop: 10 }}>Loading photos...</Text>
           </View>
+        ) : (
+          <FlatList
+            data={photos}
+            keyExtractor={(item, index) =>
+              item.uri ?? item.assetId ?? index.toString()
+            }
+            renderItem={({ item }) => (
+              <View style={{ margin: 5 }}>
+                <Image
+                  source={{ uri: item.uri }}
+                  style={{ width: 100, height: 100 }}
+                />
+                <Text style={{ width: 100, textAlign: "center" }}>
+                  {item.fileName || "Unknown"}
+                </Text>
+              </View>
+            )}
+            numColumns={3}
+            refreshing={loading}
+            onRefresh={fetchPhotos}
+          />
         )}
-        numColumns={3}
-      />
-      <Pressable onPress={() => logOut()}>
-        <Text>LogOut</Text>
-      </Pressable>
+        
+        <TouchableOpacity 
+          onPress={handleManualUpload}
+          disabled={syncing}
+          style={[styles.button, syncing && styles.buttonDisabled]}
+        >
+          {syncing ? (
+            <ActivityIndicator size="small" color="white" />
+          ) : (
+            <Text style={styles.buttonText}>Upload new Photos</Text>
+          )}
+        </TouchableOpacity>
+        
+        <Pressable onPress={() => logOut()}>
+          <Text>LogOut</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  button: {
+    backgroundColor: "#007BFF",
+    width: 150,
+    padding: 10,
+    borderRadius: 5,
+    textAlign: "center",
+    marginTop: 15,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  buttonDisabled: {
+    backgroundColor: "#ccc",
+  },
+  buttonText: {
+    color: "white",
+    textAlign: "center",
+  },
+});
