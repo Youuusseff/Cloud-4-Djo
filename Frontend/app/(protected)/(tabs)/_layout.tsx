@@ -1,25 +1,52 @@
+import { useSync } from "@/contexts/SyncContext";
+import { syncPhotos } from "@/utils/syncPhotos";
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
-import { TouchableOpacity, ActivityIndicator } from "react-native";
-import { syncPhotos } from "@/utils/syncPhotos";
-import { useState } from "react";
-import { useSync } from "@/contexts/SyncContext";
+import { ActivityIndicator, Alert, TouchableOpacity } from "react-native";
 
 export default function TabLayout() {
   const { syncing, setSyncing, triggerRefresh } = useSync();
 
-  const handleUpload = async () => {
+  const showSyncOptions = () => {
     if (syncing) return;
-    
+
+    Alert.alert(
+      "Sync Photos",
+      "Choose sync option:",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Sync New Only",
+          onPress: () => handleSync(false),
+        },
+        {
+          text: "Sync All Photos",
+          onPress: () => handleSync(true),
+          style: "destructive", // Optional: makes it stand out
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
+  const handleSync = async (syncAll = false) => {
     setSyncing(true);
     
-    await syncPhotos((newPhotos) => {
-      // You can handle the new photos here if needed
-      console.log("New photos uploaded:", newPhotos);
-    });
-    
-    setSyncing(false);
-    triggerRefresh()
+    try {
+      await syncPhotos((newPhotos) => {
+        console.log(`${syncAll ? 'All' : 'New'} photos synced:`, newPhotos);
+      }, syncAll);
+      
+      triggerRefresh();
+    } catch (error) {
+      console.error("Sync error:", error);
+      Alert.alert("Sync Error", "Failed to sync photos. Please try again.");
+    } finally {
+      setSyncing(false);
+    }
   };
 
   return (
@@ -33,17 +60,16 @@ export default function TabLayout() {
         name="index"
         options={{
           headerShown: false,
-          href: null, // This hides the tab from the tab bar
+          href: null,
         }}
       />
-      
       <Tabs.Screen
         name="actionButton"
         options={{
           title: "",
           tabBarButton: () => (
             <TouchableOpacity
-              onPress={handleUpload}
+              onPress={showSyncOptions}
               disabled={syncing}
               style={{
                 flex: 1,
