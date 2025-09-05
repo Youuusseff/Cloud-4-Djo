@@ -3,13 +3,13 @@ import { Tabs } from "expo-router";
 import { TouchableOpacity, ActivityIndicator } from "react-native";
 import { syncPhotos } from "@/utils/syncPhotos";
 import { useState } from "react";
-import * as ImagePicker from "expo-image-picker";
+import { useSync } from "@/contexts/SyncContext";
 
 export default function TabLayout() {
-  const [syncing, setSyncing] = useState(false);
+  const { syncing, setSyncing, triggerRefresh } = useSync();
 
   const handleUpload = async () => {
-    if (syncing) return; // Prevent multiple simultaneous uploads
+    if (syncing) return;
     
     setSyncing(true);
     
@@ -19,6 +19,7 @@ export default function TabLayout() {
     });
     
     setSyncing(false);
+    triggerRefresh()
   };
 
   return (

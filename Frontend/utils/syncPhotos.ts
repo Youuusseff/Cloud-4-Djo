@@ -4,7 +4,7 @@ import * as ImagePicker from "expo-image-picker";
 import { Alert } from "react-native";
 import Toast from "react-native-toast-message";
 
-export const syncPhotos = async (onSuccess?: (newPhotos: ImagePicker.ImagePickerAsset[]) => ImagePicker.ImagePickerAsset[]) => {
+export const syncPhotos = async (onSuccess?: (newPhotos: ImagePicker.ImagePickerAsset[]) => void) => {
   try {
     // Request permissions first
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -50,7 +50,6 @@ export const syncPhotos = async (onSuccess?: (newPhotos: ImagePicker.ImagePicker
         text1: "Upload Successful",
         text2: `Successfully uploaded ${result.assets.length} photos!`,
       });
-      return result.assets;
     }
   } catch (error) {
     console.error("Error selecting images:", error);

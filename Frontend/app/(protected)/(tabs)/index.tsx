@@ -1,7 +1,7 @@
+import { useSync } from "@/contexts/SyncContext";
 import { useUserContext } from "@/hooks/useUser";
 import { getList } from "@/utils/api";
 import formatBytes from "@/utils/formatBytes";
-import { syncPhotos } from "@/utils/syncPhotos";
 import { useFocusEffect } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
 import React, { useCallback, useEffect, useState } from "react";
@@ -13,9 +13,9 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View
 } from "react-native";
+
 
 export default function HomeScreen() {
   const [photos, setPhotos] = useState<ImagePicker.ImagePickerAsset[]>([]);
@@ -23,6 +23,7 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const { logOut, username } = useUserContext();
   const [usedStorage, setUsedStorage] = useState("0 Mb");
+  const { refreshTrigger } = useSync();
 
   useEffect(() => {
     let total = 0;
@@ -55,41 +56,18 @@ export default function HomeScreen() {
     fetchPhotos();
   }, []);
 
+  useEffect(() => {
+    if (refreshTrigger > 0) {
+      fetchPhotos();
+    }
+  }, [refreshTrigger]);
+
   // Refresh photos when screen comes into focus (after uploading from tab button)
   useFocusEffect(
     useCallback(() => {
       fetchPhotos();
     }, [])
   );
-
-  const handleManualUpload = async () => {
-  if (syncing) return;
-  
-  setSyncing(true);
-
-  try {
-    const addedPhotos = await syncPhotos();
-    
-    if (addedPhotos) {
-      // Filter out duplicates based on uri and update state in a single call
-      setPhotos((prevPhotos) => {
-        const newPhotos = addedPhotos.filter(
-          (newPhoto) =>
-            !prevPhotos.some(
-              (existingPhoto) =>
-                existingPhoto.uri === newPhoto.uri
-            )
-        );
-        return [...prevPhotos, ...newPhotos];
-      });
-    }
-  } catch (error) {
-    console.error("Error uploading photos:", error);
-  } finally {
-    setSyncing(false);
-  }
-};
-
   console.log("Used Storage: ", usedStorage);
   console.log("total size : ", usedStorage);
 
@@ -153,7 +131,7 @@ export default function HomeScreen() {
               <View style={{ margin: 5 }}>
                 <Image
                   source={{ uri: item.uri }}
-                  style={{ width: 100, height: 100 }}
+                  style={{ width: 100, height: 100, borderRadius: 10 }}
                 />
                 <Text style={{ width: 100, textAlign: "center" }}>
                   {item.fileName || "Unknown"}
@@ -165,19 +143,6 @@ export default function HomeScreen() {
             onRefresh={fetchPhotos}
           />
         )}
-        
-        <TouchableOpacity 
-          onPress={handleManualUpload}
-          disabled={syncing}
-          style={[styles.button, syncing && styles.buttonDisabled]}
-        >
-          {syncing ? (
-            <ActivityIndicator size="small" color="white" />
-          ) : (
-            <Text style={styles.buttonText}>Upload new Photos</Text>
-          )}
-        </TouchableOpacity>
-        
         <Pressable onPress={() => logOut()}>
           <Text>LogOut</Text>
         </Pressable>
