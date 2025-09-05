@@ -2,35 +2,39 @@ import { useSync } from "@/contexts/SyncContext";
 import { syncPhotos } from "@/utils/syncPhotos";
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
-import { ActivityIndicator, Alert, TouchableOpacity } from "react-native";
+import { ActivityIndicator, Alert, Platform, TouchableOpacity } from "react-native";
 
 export default function TabLayout() {
   const { syncing, setSyncing, triggerRefresh } = useSync();
 
   const showSyncOptions = () => {
     if (syncing) return;
-
-    Alert.alert(
-      "Sync Photos",
-      "Choose sync option:",
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
-        {
-          text: "Sync New Only",
-          onPress: () => handleSync(false),
-        },
-        {
-          text: "Sync All Photos",
-          onPress: () => handleSync(true),
-          style: "destructive", // Optional: makes it stand out
-        },
-      ],
-      { cancelable: true }
-    );
-  };
+    if (Platform.OS != "web"){
+      Alert.alert(
+        "Sync Photos",
+        "Choose sync option:",
+        [
+          {
+            text: "Cancel",
+            style: "cancel",
+          },
+          {
+            text: "Sync New Only",
+            onPress: () => handleSync(false),
+          },
+          {
+            text: "Sync All Photos",
+            onPress: () => handleSync(true),
+            style: "destructive", // Optional: makes it stand out
+          },
+        ],
+        { cancelable: true }
+      );
+    }
+    else{
+      handleSync(false);
+    }
+} 
 
   const handleSync = async (syncAll = false) => {
     setSyncing(true);
