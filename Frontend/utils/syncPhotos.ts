@@ -6,7 +6,7 @@ import { Alert } from "react-native";
 import Toast from "react-native-toast-message";
 
 export const syncPhotos = async (
-  onSuccess?: (newPhotos: ImagePicker.ImagePickerAsset[]) => void, 
+  onSuccess?: (newAssets: ImagePicker.ImagePickerAsset[]) => void,
   syncAll = false
 ) => {
   try {
@@ -15,7 +15,7 @@ export const syncPhotos = async (
     if (status !== "granted") {
       Alert.alert(
         "Permission Required",
-        "This app needs access to your photo library to select photos.",
+        "This app needs access to your media library.",
         [{ text: "OK" }]
       );
       return;
@@ -24,20 +24,20 @@ export const syncPhotos = async (
     let result: ImagePicker.ImagePickerResult;
 
     if (syncAll) {
-      // Request media library permissions for accessing all photos
+      // Request Media Library permissions
       const mediaLibraryPermission = await MediaLibrary.requestPermissionsAsync();
       if (mediaLibraryPermission.status !== "granted") {
         Alert.alert(
           "Permission Required",
-          "This app needs access to your media library to sync all photos.",
+          "This app needs access to your media library to sync all photos & videos.",
           [{ text: "OK" }]
         );
         return;
       }
 
-      // Get all photos from the device
+      // Fetch both photos and videos
       const albumAssets = await MediaLibrary.getAssetsAsync({
-        mediaType: MediaLibrary.MediaType.photo,
+        mediaType: [MediaLibrary.MediaType.photo, MediaLibrary.MediaType.video],
         first: 1000,
         sortBy: MediaLibrary.SortBy.creationTime,
       });
@@ -45,8 +45,8 @@ export const syncPhotos = async (
       if (albumAssets.assets.length === 0) {
         Toast.show({
           type: "info",
-          text1: "No Photos Found",
-          text2: "No photos found in your library.",
+          text1: "No Media Found",
+          text2: "No photos or videos found in your library.",
         });
         return;
       }
@@ -55,15 +55,14 @@ export const syncPhotos = async (
       const convertedAssets: ImagePicker.ImagePickerAsset[] = await Promise.all(
         albumAssets.assets.map(async (asset) => {
           const assetInfo = await MediaLibrary.getAssetInfoAsync(asset);
-          
-          // Get file extension and determine proper type
-          const fileExtension = asset.filename.split('.').pop()?.toLowerCase();
-          let mediaType: "image" | "video" | "livePhoto" | "pairedVideo" | undefined;
-          
-          if (fileExtension && ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(fileExtension)) {
+
+          const fileExtension = asset.filename.split(".").pop()?.toLowerCase();
+          let mediaType: "image" | "video" = "image";
+
+          if (asset.mediaType === MediaLibrary.MediaType.video) {
+            mediaType = "video";
+          } else if (fileExtension && ["jpg", "jpeg", "png", "gif", "bmp", "webp"].includes(fileExtension)) {
             mediaType = "image";
-          } else {
-            mediaType = "image"; // Default to image
           }
 
           return {
@@ -71,16 +70,16 @@ export const syncPhotos = async (
             uri: assetInfo.localUri || assetInfo.uri,
             fileName: asset.filename,
             type: mediaType,
-            fileSize: undefined, // AssetInfo doesn't have fileSize property
+            fileSize: undefined,
             width: asset.width,
             height: asset.height,
             exif: null,
             base64: null,
+            duration: asset.duration, // useful for videos
           };
         })
       );
 
-      // Create a mock result object similar to ImagePicker result
       result = {
         canceled: false,
         assets: convertedAssets,
@@ -88,34 +87,39 @@ export const syncPhotos = async (
 
       Toast.show({
         type: "info",
-        text1: "Syncing All Photos",
-        text2: `Found ${convertedAssets.length} photos to sync...`,
+        text1: "Syncing All Media",
+        text2: `Found ${convertedAssets.length} photos/videos to sync...`,
       });
 
     } else {
-      // Launch image picker for manual selection
+      // Manual selection of both photos and videos
       result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ImagePicker.MediaTypeOptions.All, // ✅ includes both images & videos
         allowsMultipleSelection: true,
         quality: 1,
       });
     }
 
-    console.log("ImagePicker result:", result);
-
     if (!result.canceled && result.assets) {
-      console.log("Assets:", result.assets);
-      
-      // Convert assets to your expected format
-      const assets = result.assets.map((asset) => ({
-        uri: asset.uri,
-        fileName: asset.fileName || `image_${Date.now()}.jpg`,
-        type: asset.type || "image/jpeg",
-        fileSize: asset.fileSize,
-      }));
+      const assets = result.assets.map((asset) => {
+        let mimeType = "application/octet-stream";
 
-      // Upload in batches if there are many photos
-      const batchSize = 10; // Upload 10 photos at a time
+        if (asset.type === "image") {
+          mimeType = "image/jpeg"; // default
+        } else if (asset.type === "video") {
+          mimeType = "video/mp4"; // default for videos
+        }
+
+        return {
+          uri: asset.uri,
+          fileName: asset.fileName || `${asset.type}_${Date.now()}`,
+          type: mimeType,
+          fileSize: asset.fileSize,
+        };
+      });
+
+      // Upload in batches
+      const batchSize = 5; // videos are heavier, use smaller batch size
       const batches = [];
       for (let i = 0; i < assets.length; i += batchSize) {
         batches.push(assets.slice(i, i + batchSize));
@@ -125,18 +129,16 @@ export const syncPhotos = async (
       for (const batch of batches) {
         await uploadPhotosBatch(batch);
         totalUploaded += batch.length;
-        
-        // Show progress for sync all
+
         if (syncAll && batches.length > 1) {
           Toast.show({
             type: "info",
             text1: "Upload Progress",
-            text2: `Uploaded ${totalUploaded} of ${assets.length} photos...`,
+            text2: `Uploaded ${totalUploaded} of ${assets.length} media...`,
           });
         }
       }
 
-      // Call success callback with the new assets
       if (onSuccess) {
         onSuccess(result.assets);
       }
@@ -144,15 +146,15 @@ export const syncPhotos = async (
       Toast.show({
         type: "success",
         text1: "Upload Successful",
-        text2: `Successfully uploaded ${result.assets.length} photos!`,
+        text2: `Uploaded ${result.assets.length} photos/videos!`,
       });
     }
   } catch (error) {
-    console.error("Error selecting/syncing images:", error);
+    console.error("Error selecting/syncing media:", error);
     Toast.show({
       type: "error",
       text1: "Upload Failed",
-      text2: "An error occurred while uploading photos. Please try again.",
+      text2: "An error occurred while uploading media. Please try again.",
     });
     throw error;
   }

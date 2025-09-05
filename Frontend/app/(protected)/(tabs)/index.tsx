@@ -10,7 +10,6 @@ import {
   FlatList,
   Image,
   ImageBackground,
-  Pressable,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -42,7 +41,7 @@ export default function HomeScreen() {
   const [photos, setPhotos] = useState<PhotoWithMetadata[]>([]);
   const [syncing, setSyncing] = useState(false);
   const [loading, setLoading] = useState(true);
-  const { logOut, username } = useUserContext();
+  const { username } = useUserContext();
   const [usedStorage, setUsedStorage] = useState("0 Mb");
   const { refreshTrigger } = useSync();
 
@@ -113,9 +112,7 @@ export default function HomeScreen() {
 
   console.log('photos : ', photos)
 
-  // Group and sort photos by date, then create rows for proper 3-column layout
   const groupedPhotos = useMemo(() => {
-    // First sort photos by date (newest first)
     const sortedPhotos = [...photos].sort((a, b) => {
       if (!a.dateTaken && !b.dateTaken) return 0;
       if (!a.dateTaken) return 1;
@@ -123,7 +120,6 @@ export default function HomeScreen() {
       return b.dateTaken.localeCompare(a.dateTaken);
     });
 
-    // Group photos by month/year
     const groups: Array<{ month: string | null; photos: PhotoWithMetadata[] }> = [];
     let currentMonth: string | null = null;
     let currentGroupPhotos: PhotoWithMetadata[] = [];
@@ -131,9 +127,7 @@ export default function HomeScreen() {
     sortedPhotos.forEach((photo) => {
       const photoMonth = photo.dateTaken;
       
-      // If this is a new month, save the previous group and start a new one
       if (photoMonth !== currentMonth) {
-        // Save previous group if it has photos
         if (currentGroupPhotos.length > 0) {
           groups.push({
             month: currentMonth,
@@ -314,9 +308,6 @@ export default function HomeScreen() {
             onRefresh={fetchPhotos}
           />
         )}
-        <Pressable onPress={() => logOut()}>
-          <Text>LogOut</Text>
-        </Pressable>
       </View>
     </View>
   );
